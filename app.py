@@ -1,5 +1,6 @@
 import streamlit as st
 from pawpal_system import Pet, Task, Owner
+from ai_scheduler import resolve_conflicts
 
 st.set_page_config(page_title="PawPal+", page_icon="🐾", layout="centered")
 
@@ -130,10 +131,25 @@ if tasks:
                 owner.schedule.mark_task_complete(pet, t)
                 st.rerun()
 
+    RESOLUTION_ICON = {"success": "✅", "warning": "⚠️", "error": "🚫"}
+    if "ai_resolution_message" in st.session_state:
+        level, message = st.session_state.pop("ai_resolution_message")
+        getattr(st, level)(message, icon=RESOLUTION_ICON[level])
+
     conflicts = owner.schedule.get_conflicts()
     if conflicts:
         for w in conflicts:
             st.error(w, icon="⚠️")
+        if st.button("🤖 Resolve conflicts with AI"):
+            try:
+                with st.spinner("Asking Gemini to propose new times..."):
+                    result = resolve_conflicts(owner.schedule)
+            except RuntimeError as exc:
+                st.session_state.ai_resolution_message = ("error", str(exc))
+            else:
+                level = "success" if result.applied else "warning"
+                st.session_state.ai_resolution_message = (level, result.explanation)
+            st.rerun()
     else:
         st.success("No scheduling conflicts.", icon="✅")
 else:

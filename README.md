@@ -1,6 +1,8 @@
-# PawPal+ (Module 2 Project)
+# PawPal+ 
 
-You are building **PawPal+**, a Streamlit app that helps a pet owner plan care tasks for their pet.
+## Original System's Goals & Capabilities
+
+**PawPal+** is a Streamlit app that helps a pet owner plan care tasks for their pet.
 
 ## Scenario
 
@@ -10,17 +12,13 @@ A busy pet owner needs help staying consistent with pet care. They want an assis
 - Consider constraints (time available, priority, owner preferences)
 - Produce a daily plan and explain why it chose that plan
 
-Your job is to design the system first (UML), then implement the logic in Python, then connect it to the Streamlit UI.
+## Capabilities
 
-## What you will build
-
-Your final app should:
-
-- Let a user enter basic owner + pet info
-- Let a user add/edit tasks (duration + priority at minimum)
-- Generate a daily schedule/plan based on constraints and priorities
-- Display the plan clearly (and ideally explain the reasoning)
-- Include tests for the most important scheduling behaviors
+- User can enter basic owner + pet info
+- User can add/edit tasks (duration + priority at minimum)
+- Generates a daily schedule/plan based on constraints and priorities
+- Displays the plan clearly (and ideally explain the reasoning)
+- Includes tests for the most important scheduling behaviors
 
 ## Getting started
 
@@ -32,15 +30,25 @@ source .venv/bin/activate  # Windows: .venv\Scripts\activate
 pip install -r requirements.txt
 ```
 
-### Suggested workflow
+### Set up your Gemini API key
 
-1. Read the scenario carefully and identify requirements and edge cases.
-2. Draft a UML diagram (classes, attributes, methods, relationships).
-3. Convert UML into Python class stubs (no logic yet).
-4. Implement scheduling logic in small increments.
-5. Add tests to verify key behaviors.
-6. Connect your logic to the Streamlit UI in `app.py`.
-7. Refine UML so it matches what you actually built.
+Copy the example file:
+
+```bash
+cp .env.example .env
+```
+
+Edit `.env` and add your Gemini API key:
+
+```text
+GEMINI_API_KEY=your_real_key_here
+```
+
+### Run the app
+
+```bash
+streamlit run app.py
+```
 
 ## 🖥️ Sample CLI Output
 ```bash

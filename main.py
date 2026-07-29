@@ -1,4 +1,5 @@
 from pawpal_system import Owner, Pet, Task
+from ai_scheduler import resolve_conflicts
 
 
 def print_schedule(owner: Owner):
@@ -29,6 +30,20 @@ def print_conflicts(owner: Owner):
     else:
         for warning in conflicts:
             print(f"  {warning}")
+    print(f"{'='*40}\n")
+
+
+def resolve_conflicts_with_ai(owner: Owner):
+    print(f"{'='*40}")
+    print(f"  AI Conflict Resolution")
+    print(f"{'='*40}")
+    try:
+        result = resolve_conflicts(owner.schedule)
+    except RuntimeError as exc:
+        print(f"  Skipped: {exc}")
+        print(f"{'='*40}\n")
+        return
+    print(f"  {result.explanation}")
     print(f"{'='*40}\n")
 
 
@@ -144,6 +159,8 @@ if __name__ == "__main__":
     owner.schedule.mark_task_complete(luna, luna.tasks[0])   # exercise 09:00 → next due tomorrow
     owner.schedule.mark_task_complete(mochi, mochi.tasks[1]) # medication 08:00 → next due tomorrow
 
+    print_conflicts(owner)
+    resolve_conflicts_with_ai(owner)
     print_conflicts(owner)
     print_schedule(owner)
     print_pending(owner)
