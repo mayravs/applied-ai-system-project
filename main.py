@@ -1,5 +1,16 @@
+from datetime import date, timedelta
+
 from pawpal_system import Owner, Pet, Task
 from ai_scheduler import resolve_conflicts
+
+
+def _date_label(due_date: date) -> str:
+    today = date.today()
+    if due_date == today:
+        return "today"
+    if due_date == today + timedelta(days=1):
+        return "tomorrow"
+    return str(due_date)
 
 
 def print_schedule(owner: Owner):
@@ -7,7 +18,7 @@ def print_schedule(owner: Owner):
     print(f"  Today's Schedule for {owner.name}'s Pets")
     print(f"{'='*40}")
 
-    tasks = owner.schedule.get_tasks_sorted_by_time()
+    tasks = owner.schedule.get_tasks_sorted_by_time(due_date=date.today())
 
     if not tasks:
         print("  No tasks scheduled for today.")
@@ -15,7 +26,7 @@ def print_schedule(owner: Owner):
         for task in tasks:
             status = "✓" if task.is_complete else "○"
             pet_name = task.pet.name if task.pet else "Unknown"
-            print(f"  [{status}] {task.due_date} {task.time} | {pet_name} | {task.task_type} — {task.description} | {task.duration} min | {task.priority} ({task.frequency})")
+            print(f"  [{status}] {task.time} | {pet_name} | {task.task_type} — {task.description} | {task.duration} min | {task.priority} ({task.frequency})")
 
     print(f"{'='*40}\n")
 
@@ -59,7 +70,7 @@ def print_pending(owner: Owner):
     else:
         for task in pending:
             pet_name = task.pet.name if task.pet else "Unknown"
-            print(f"  ○ {task.time} | {pet_name} | {task.task_type} — {task.description} | priority: {task.priority}")
+            print(f"  ○ {_date_label(task.due_date)} {task.time} | {pet_name} | {task.task_type} — {task.description} | priority: {task.priority}")
 
     print(f"{'='*40}\n")
 

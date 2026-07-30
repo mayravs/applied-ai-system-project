@@ -34,8 +34,8 @@ classDiagram
         +get_all_completed_tasks() List~Task~
         +get_tasks_by_time(time: String) List~Task~
         +get_tasks_by_type(task_type: String) List~Task~
-        +get_conflicts() List~String~
-        +get_tasks_sorted_by_time() List~Task~
+        +get_conflicts(due_date: Date) List~String~
+        +get_tasks_sorted_by_time(due_date: Date) List~Task~
     }
 
     class Task {

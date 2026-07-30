@@ -108,6 +108,31 @@ def test_sort_pet_with_no_tasks():
     assert schedule.get_tasks_sorted_by_time() == []
 
 
+def test_due_date_filter_excludes_tasks_on_other_dates():
+    today = date.today()
+    tomorrow = today + timedelta(days=1)
+    pet = Pet(name="Luna", species="dog", age=3)
+    pet.add_task(make_task(time="09:00", due_date=today, task_type="exercise"))
+    pet.add_task(make_task(time="09:00", due_date=tomorrow, task_type="exercise"))
+
+    schedule = make_schedule(pet)
+    todays_tasks = schedule.get_tasks_sorted_by_time(due_date=today)
+
+    assert len(todays_tasks) == 1
+    assert todays_tasks[0].due_date == today
+
+
+def test_no_due_date_filter_returns_tasks_from_every_date():
+    today = date.today()
+    tomorrow = today + timedelta(days=1)
+    pet = Pet(name="Luna", species="dog", age=3)
+    pet.add_task(make_task(time="09:00", due_date=today))
+    pet.add_task(make_task(time="10:00", due_date=tomorrow))
+
+    schedule = make_schedule(pet)
+    assert len(schedule.get_tasks_sorted_by_time()) == 2
+
+
 # ---------------------------------------------------------------------------
 # Recurrence logic
 # ---------------------------------------------------------------------------
@@ -233,3 +258,17 @@ def test_no_conflicts_with_single_task():
 
     schedule = make_schedule(pet)
     assert schedule.get_conflicts() == []
+
+
+def test_due_date_filter_hides_conflicts_on_other_days():
+    today = date.today()
+    tomorrow = today + timedelta(days=1)
+    pet = Pet(name="Rex", species="dog", age=2)
+    pet.add_task(make_task(time="09:00", duration=30, due_date=tomorrow, task_type="walk"))
+    pet.add_task(make_task(time="09:00", duration=30, due_date=tomorrow, task_type="bath"))
+
+    schedule = make_schedule(pet)
+
+    assert schedule.get_conflicts(due_date=today) == []
+    assert len(schedule.get_conflicts(due_date=tomorrow)) == 1
+    assert len(schedule.get_conflicts()) == 1

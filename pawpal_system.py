@@ -129,14 +129,20 @@ class Schedule:
         """Convert a time string in HH:MM format to total minutes since midnight."""
         return int(time_str[:2]) * 60 + int(time_str[3:])
 
-    def get_conflicts(self) -> list[str]:
+    def get_conflicts(self, due_date: date = None) -> list[str]:
         """Return a warning string for every pair of tasks whose time windows overlap.
 
         Two tasks conflict when: a_start < b_end AND b_start < a_end.
         This catches both exact same-start and partial duration overlaps.
         Never raises — callers receive an empty list when the schedule is clean.
+
+        If due_date is given, only tasks due on that date are considered — lets a
+        "today's plan" view report only today's conflicts instead of ones on other days.
         """
-        indexed = [(pet, task) for pet in self.pets for task in pet.tasks]
+        indexed = [
+            (pet, task) for pet in self.pets for task in pet.tasks
+            if due_date is None or task.due_date == due_date
+        ]
         warnings = []
         for i, (pet_a, task_a) in enumerate(indexed):
             a_start = self._to_minutes(task_a.time)
@@ -154,10 +160,18 @@ class Schedule:
                     )
         return warnings
 
-    def get_tasks_sorted_by_time(self) -> list[Task]:
-        """Return all tasks across every pet sorted chronologically."""
+    def get_tasks_sorted_by_time(self, due_date: date = None) -> list[Task]:
+        """Return tasks across every pet sorted chronologically.
+
+        If due_date is given, only tasks due on that date are included — this is what
+        powers "today's plan" so a recurring task's freshly-created next occurrence
+        (due tomorrow) doesn't show up alongside the one just marked complete today.
+        """
         PRIORITY_ORDER = {"high": 0, "medium": 1, "low": 2} # used as a tiebreaker for tasks with the same time
-        all_tasks = [task for pet in self.pets for task in pet.tasks]
+        all_tasks = [
+            task for pet in self.pets for task in pet.tasks
+            if due_date is None or task.due_date == due_date
+        ]
         return sorted(all_tasks,key=lambda t: (int(t.time[:2]) * 60 + int(t.time[3:]), PRIORITY_ORDER.get(t.priority, 99)))
 
 class Owner:

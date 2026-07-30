@@ -1,0 +1,53 @@
+flowchart TD
+    subgraph Entry["Input: Entry Points"]
+        CLI["main.py<br/>hardcoded demo Owner/Pets/Tasks"]
+        UI["app.py (Streamlit)<br/>user enters owner, pet, task, due-date form input"]
+    end
+
+    CLI --> Core
+    UI --> Core
+
+    subgraph Core["Processing: Core Scheduling (pawpal_system.py)"]
+        AddTask["Schedule.add_task(pet, task)"]
+        MarkDone["Schedule.mark_task_complete(pet, task)<br/>Task.mark_complete() creates next daily/weekly occurrence"]
+        Sort["Schedule.get_tasks_sorted_by_time(due_date)<br/>chronological sort, priority tiebreaker"]
+        Conflicts["Schedule.get_conflicts(due_date)<br/>interval overlap check across all pets"]
+
+        AddTask --> Sort
+        MarkDone --> Sort
+        Sort --> Conflicts
+    end
+
+    Conflicts -->|"no conflicts"| Output
+    Conflicts -->|"conflicts found"| HumanTrigger
+
+    HumanTrigger["Human checkpoint: invoking the agent<br/>CLI (main.py): runs automatically<br/>Streamlit (app.py): human must click 🤖 Resolve conflicts with AI"]
+    HumanTrigger --> Plan
+
+    subgraph AI["Processing: Agent — AI Conflict Resolution (ai_scheduler.py)"]
+        Plan["Agent — plan<br/>_build_prompt(): conflicting tasks + full task list + prior-attempt feedback"]
+        Act["Agent — act<br/>client.models.generate_content(): Gemini gemini-flash-latest, JSON-only response"]
+        ParseValidate["Agent — act<br/>_request_proposal(): validate task id range + HH:MM format, drop anything invalid"]
+        Trial["Agent — act<br/>copy.deepcopy(schedule): apply proposed times to the TRIAL copy only"]
+        Verify{"Evaluator (guardrail)<br/>Schedule.get_conflicts() re-run on trial copy — never trusts the model's own claim"}
+
+        Plan --> Act --> ParseValidate --> Trial --> Verify
+        Verify -->|"still conflicting AND attempts < 2"| Plan
+        Verify -->|"conflict-free"| Apply["apply same times to the LIVE schedule<br/>ResolutionResult(applied=True)"]
+        Verify -->|"attempts exhausted"| FailSafe["live schedule left untouched<br/>ResolutionResult(applied=False) — human told manual review is needed"]
+    end
+
+    Tester["Tester (offline, pre-deployment)<br/>tests/test_ai_scheduler.py — fake Gemini client drives Agent + Evaluator<br/>through valid / invalid / lying proposals before this ever hits the real API"]
+    Tester -.->|"verifies"| AI
+
+    Apply --> Log["logger → ai_scheduler.log<br/>every attempt, success or failure"]
+    FailSafe --> Log
+    Log --> Output
+
+    subgraph Output["Output"]
+        CLIOut["CLI: print_schedule() / print_conflicts()<br/>Today's Schedule, Conflict Report"]
+        UIOut["Streamlit: Build Schedule section<br/>conflict banner, metrics, inline Mark done"]
+    end
+
+    Output --> CLIOut
+    Output --> UIOut

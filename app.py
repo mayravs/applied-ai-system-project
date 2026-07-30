@@ -1,6 +1,17 @@
+from datetime import date, timedelta
+
 import streamlit as st
 from pawpal_system import Pet, Task, Owner
 from ai_scheduler import resolve_conflicts
+
+
+def date_label(due_date: date) -> str:
+    today = date.today()
+    if due_date == today:
+        return "today"
+    if due_date == today + timedelta(days=1):
+        return "tomorrow"
+    return due_date.strftime("%b %d")
 
 st.set_page_config(page_title="PawPal+", page_icon="🐾", layout="centered")
 
@@ -18,6 +29,16 @@ Your system represents pets, tasks, and an owner, then builds and explains a dai
 
 PRIORITY_ICON = {"high": "🔴", "medium": "🟡", "low": "🟢"}
 SPECIES_EMOJI = {"dog": "🐶", "cat": "🐱", "other": "🐾"}
+
+DONE_PILL_HTML = (
+    '<div style="background-color:rgba(33,195,84,0.15);color:rgb(23,114,51);'
+    'border-radius:0.5rem;padding:0.5rem 0.75rem;text-align:center;font-size:0.875rem;">'
+    "✅ done</div>"
+)
+
+
+def done_pill():
+    st.markdown(DONE_PILL_HTML, unsafe_allow_html=True)
 
 st.divider()
 
@@ -72,23 +93,27 @@ with st.form("add_pet_form"):
         st.session_state.owner.add_pet(new_pet)
         st.rerun()
 
-pet = owner.pets[0] if owner.pets else None
-
 st.divider()
 
 # ── Tasks ──────────────────────────────────────────────────────────────────
 st.subheader("Tasks")
 
-if pet is None:
+if not owner.pets:
     st.warning("Add a pet above before adding tasks.")
     st.stop()
 
-st.caption(f"Adding tasks for **{pet.name}** {SPECIES_EMOJI.get(pet.species, '🐾')}")
+pet_index = st.selectbox(
+    "Pet",
+    options=range(len(owner.pets)),
+    format_func=lambda i: f"{owner.pets[i].name} {SPECIES_EMOJI.get(owner.pets[i].species, '🐾')}",
+)
+pet = owner.pets[pet_index]
 
 col1, col2, col3 = st.columns(3)
 with col1:
     task_title = st.text_input("Task title", value="Morning walk")
     task_time  = st.text_input("Time (HH:MM)", value="08:00")
+    task_due_date = st.date_input("Due date", value=date.today())
 with col2:
     duration  = st.number_input("Duration (minutes)", min_value=1, max_value=240, value=20)
     frequency = st.selectbox("Frequency", ["daily", "weekly", "once"])
@@ -105,6 +130,7 @@ if st.button("Add task", type="primary"):
         time=task_time,
         frequency=frequency,
         pet=pet,
+        due_date=task_due_date,
     )
     owner.schedule.add_task(pet, task)
     st.rerun()
@@ -113,23 +139,21 @@ tasks = owner.schedule.get_tasks_for_pet(pet)
 
 if tasks:
     st.markdown(f"**{len(tasks)} task(s) for {pet.name}:**")
-    for i, t in enumerate(tasks):
+    for t in tasks:
         icon = PRIORITY_ICON.get(t.priority, "⚪")
-        c1, c2, c3 = st.columns([5, 1, 1])
+        c1, c2 = st.columns([5, 1])
         with c1:
+            label = date_label(t.due_date)
             if t.is_complete:
-                st.markdown(f"{icon} ~~{t.task_type}~~ · {t.time} · {t.duration} min · _{t.frequency}_")
+                st.markdown(f"{icon} ~~{t.task_type}~~ · _{label}_ {t.time} · {t.duration} min · _{t.frequency}_")
             else:
-                st.markdown(f"{icon} **{t.task_type}** · {t.time} · {t.duration} min · _{t.frequency}_")
+                st.markdown(f"{icon} **{t.task_type}** · _{label}_ {t.time} · {t.duration} min · _{t.frequency}_")
         with c2:
             if t.is_complete:
-                st.success("done", icon="✅")
+                st.caption("✅ done")
             else:
                 st.caption("⏳ pending")
-        with c3:
-            if not t.is_complete and st.button("Mark done", key=f"done_{i}"):
-                owner.schedule.mark_task_complete(pet, t)
-                st.rerun()
+    st.caption("Mark tasks done from today's plan in the Build Schedule section below.")
 
     RESOLUTION_ICON = {"success": "✅", "warning": "⚠️", "error": "🚫"}
     if "ai_resolution_message" in st.session_state:
@@ -159,15 +183,19 @@ st.divider()
 
 # ── Schedule ───────────────────────────────────────────────────────────────
 st.subheader("Build Schedule")
+st.caption(f"Today's plan — {date.today().strftime('%B %d, %Y')}. Recurring tasks due on other days won't clutter this view.")
 
 if st.button("Generate schedule", type="primary"):
-    sorted_tasks = owner.schedule.get_tasks_sorted_by_time()
-    pending      = owner.schedule.get_all_pending_tasks()
-    completed    = owner.schedule.get_all_completed_tasks()
-    conflicts    = owner.schedule.get_conflicts()
+    st.session_state.schedule_generated = True
+
+if st.session_state.get("schedule_generated"):
+    sorted_tasks = owner.schedule.get_tasks_sorted_by_time(due_date=date.today())
+    pending      = [t for t in sorted_tasks if not t.is_complete]
+    completed    = [t for t in sorted_tasks if t.is_complete]
+    conflicts    = owner.schedule.get_conflicts(due_date=date.today())
 
     if not sorted_tasks:
-        st.info("No tasks scheduled yet — add tasks above, then generate the schedule.")
+        st.info("No tasks due today — add tasks above, then generate the schedule.")
     else:
         # Conflict status banner
         if conflicts:
@@ -187,19 +215,22 @@ if st.button("Generate schedule", type="primary"):
             pct = len(completed) / total
             st.progress(pct, text=f"{len(completed)} of {total} tasks complete")
 
-        # Chronological table
+        # Chronological schedule with inline completion
         st.markdown("**Chronological schedule:**")
-        st.dataframe(
-            [
-                {
-                    "time":          t.time,
-                    "task":          f"{PRIORITY_ICON.get(t.priority, '⚪')} {t.task_type}",
-                    "duration (min)": t.duration,
-                    "priority":      t.priority,
-                    "status":        "✅ done" if t.is_complete else "⏳ pending",
-                }
-                for t in sorted_tasks
-            ],
-            use_container_width=True,
-            hide_index=True,
-        )
+        for i, t in enumerate(sorted_tasks):
+            icon = PRIORITY_ICON.get(t.priority, "⚪")
+            c1, c2, c3 = st.columns([4, 2, 1])
+            with c1:
+                if t.is_complete:
+                    st.markdown(f"{icon} ~~{t.task_type}~~ · {t.time} · {t.duration} min · _{t.pet.name}_")
+                else:
+                    st.markdown(f"{icon} **{t.task_type}** · {t.time} · {t.duration} min · _{t.pet.name}_")
+            with c2:
+                if t.is_complete:
+                    done_pill()
+                else:
+                    st.caption("⏳ pending")
+            with c3:
+                if not t.is_complete and st.button("Mark done", key=f"sched_done_{i}"):
+                    owner.schedule.mark_task_complete(t.pet, t)
+                    st.rerun()
